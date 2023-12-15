@@ -13,6 +13,6 @@ const todoSchema = new Schema<TodoItem>({
   timeSpent: { type: Number, required: false },
 });
 
-const TodoModal = mongoose.model<TodoItem>('todoItems', todoSchema);
+const TodoModel = mongoose.model<TodoItem>('todoitems', todoSchema);
 
-export default TodoModal;
+export default TodoModel;

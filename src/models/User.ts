@@ -4,9 +4,9 @@ import { User } from '../types';
 const userSchema = new Schema<User>({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  todoItems: [{ type: Schema.Types.ObjectId, ref: 'todoItems' }],
+  todoItems: [{ type: Schema.Types.ObjectId, ref: 'todoitems' }],
 });
 
-const UserModal = mongoose.model<User>('users', userSchema);
+const UserModel = mongoose.model<User>('users', userSchema);
 
-export default UserModal;
+export default UserModel;

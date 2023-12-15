@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
 import { User } from '../types';
-import UserModal from '../models/User';
+import UserModel from '../models/User';
 import { generateToken } from '../utils/authUtils';
 import bcrypt from 'bcryptjs';
 
 const isExistingUser = async (username: string): Promise<User> => {
-  return (await UserModal.findOne({ username })) as User;
+  return (await UserModel.findOne({ username })) as User;
 };
 
 const register = async (req: Request, res: Response): Promise<void> => {
@@ -24,15 +24,15 @@ const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const newUser: User = await UserModal.create({
+    const newUser: User = await UserModel.create({
       username,
       password: hashedPassword,
       todoItems: [],
     });
 
     const token = generateToken(newUser);
-    console.log(token);
-    res.status(201).json({ token });
+    res.setHeader('Set-Cookie', `token=${token}; HttpOnly`);
+    res.status(201).json({ message: 'Registration successful' });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Something went wrong on server' });
@@ -58,7 +58,8 @@ const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const token = generateToken(existingUser);
-    res.status(200).json({ token });
+    res.setHeader('Set-Cookie', `token=${token}; HttpOnly`);
+    res.status(200).json({ message: 'Login successful' });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: 'Something went wrong on server' });
