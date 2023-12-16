@@ -1,5 +1,4 @@
 import express from 'express';
-import dotenv from 'dotenv';
 import connectDB from './db';
 import authRoutes from './routes/auth';
 import todoRoutes from './routes/todo';
@@ -13,6 +12,8 @@ const PORT = process.env.PORT || 8585;
 connectDB();
 
 app.use(express.json());
+
+app.use(express.urlencoded({ extended: true }));
 
 app.use('/auth', authRoutes);
 app.use('/todo', authMiddleware, todoRoutes);

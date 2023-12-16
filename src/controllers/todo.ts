@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { TodoItem } from '../types';
 import TodoModel from '../models/Todo';
+import { upload } from '../utils/fileUpload';
 
 const getTodosByIds = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -22,21 +23,39 @@ const getTodosByIds = async (req: Request, res: Response): Promise<void> => {
 
 const createTodo = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, tags, attachmentFileUrl, thumbnailUrl } = req.body;
+    console.log(req.body);
+    const { title, description, tags } = req.body;
 
-    const newTodo: TodoItem = await TodoModel.create({
-      title,
-      description,
-      tags,
-      attachmentFileUrl,
-      thumbnailUrl,
-      creationDate: new Date().toISOString(),
-      lastUpdatedDate: new Date().toISOString(),
-      isActive: true,
-      timeSpent: 0,
+    console.log(title);
+
+    upload.fields([
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'attachment', maxCount: 1 },
+    ])(req, res, async (err: any) => {
+      if (err) {
+        console.error('Error uploading files:', err);
+        res.status(500).json({ message: 'Error uploading files' });
+        return;
+      }
+
+      const files = req.files as { [fieldname: string]: Express.MulterS3.File[] } | undefined;
+      const thumbnailUrl = files?.['thumbnail']?.[0]?.location;
+      const attachmentFileUrl = files?.['attachment']?.[0]?.location;
+
+      const newTodo: TodoItem = await TodoModel.create({
+        title,
+        description,
+        tags,
+        attachmentFileUrl,
+        thumbnailUrl,
+        creationDate: new Date().toISOString(),
+        lastUpdatedDate: new Date().toISOString(),
+        isActive: true,
+        timeSpent: 0,
+      });
+
+      res.status(201).json({ todo: newTodo });
     });
-
-    res.status(201).json({ todo: newTodo });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Something went wrong on the server' });
@@ -46,29 +65,44 @@ const createTodo = async (req: Request, res: Response): Promise<void> => {
 const updateTodo = async (req: Request, res: Response): Promise<void> => {
   try {
     const { _id } = req.params;
-    const { title, description, tags, attachmentFileUrl, isActive, timeSpent, thumbnailUrl } = req.body;
+    const { title, description, tags, isActive, timeSpent } = req.body;
 
-    const updatedTodo = await TodoModel.findByIdAndUpdate(
-      _id,
-      {
-        title,
-        description,
-        tags,
-        attachmentFileUrl,
-        thumbnailUrl,
-        lastUpdatedDate: new Date().toISOString(),
-        isActive,
-        timeSpent,
-      },
-      { new: true }
-    );
+    upload.fields([
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'attachment', maxCount: 1 },
+    ])(req, res, async (err: any) => {
+      if (err) {
+        console.error('Error uploading files:', err);
+        res.status(500).json({ message: 'Error uploading files' });
+        return;
+      }
 
-    if (!updatedTodo) {
-      res.status(404).json({ message: 'Todo not found' });
-      return;
-    }
+      const files = req.files as { [fieldname: string]: Express.MulterS3.File[] } | undefined;
+      const thumbnailUrl = files?.['thumbnail']?.[0]?.location;
+      const attachmentFileUrl = files?.['attachment']?.[0]?.location;
 
-    res.status(200).json({ todo: updatedTodo });
+      const updatedTodo = await TodoModel.findByIdAndUpdate(
+        _id,
+        {
+          title,
+          description,
+          tags,
+          thumbnailUrl,
+          attachmentFileUrl,
+          lastUpdatedDate: new Date().toISOString(),
+          isActive,
+          timeSpent,
+        },
+        { new: true }
+      );
+
+      if (!updatedTodo) {
+        res.status(404).json({ message: 'Todo not found' });
+        return;
+      }
+
+      res.status(200).json({ todo: updatedTodo });
+    });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Something went wrong on the server' });
