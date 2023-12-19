@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { TodoItem } from '../types';
 import TodoModel from '../models/Todo';
+import UserModel from '../models/User';
 import { upload } from '../utils/fileUpload';
 
 const getTodosByIds = async (req: Request, res: Response): Promise<void> => {
@@ -21,41 +22,40 @@ const getTodosByIds = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-const createTodo = async (req: Request, res: Response): Promise<void> => {
+const uploadFile = async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log(req.body);
-    const { title, description, tags } = req.body;
-
-    console.log(title);
-
-    upload.fields([
-      { name: 'thumbnail', maxCount: 1 },
-      { name: 'attachment', maxCount: 1 },
-    ])(req, res, async (err: any) => {
+    upload.single('file')(req, res, (err: any) => {
       if (err) {
-        console.error('Error uploading files:', err);
-        res.status(500).json({ message: 'Error uploading files' });
+        console.error('Error uploading file:', err);
+        res.status(500).json({ message: 'Error uploading file' });
         return;
       }
 
-      const files = req.files as { [fieldname: string]: Express.MulterS3.File[] } | undefined;
-      const thumbnailUrl = files?.['thumbnail']?.[0]?.location;
-      const attachmentFileUrl = files?.['attachment']?.[0]?.location;
-
-      const newTodo: TodoItem = await TodoModel.create({
-        title,
-        description,
-        tags,
-        attachmentFileUrl,
-        thumbnailUrl,
-        creationDate: new Date().toISOString(),
-        lastUpdatedDate: new Date().toISOString(),
-        isActive: true,
-        timeSpent: 0,
-      });
-
-      res.status(201).json({ todo: newTodo });
+      const fileUrl = (req.file as any).location;
+      res.status(201).json({ fileUrl });
     });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Something went wrong on the server' });
+  }
+};
+
+const createTodo = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { title, description, tags, attachmentFileUrl, thumbnailUrl } = req.body;
+    const newTodo: TodoItem = await TodoModel.create({
+      title,
+      description,
+      tags,
+      attachmentFileUrl,
+      thumbnailUrl,
+      creationDate: new Date().toISOString(),
+      lastUpdatedDate: new Date().toISOString(),
+      isActive: true,
+      timeSpent: 0,
+    });
+
+    res.status(201).json({ todoId: newTodo._id });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Something went wrong on the server' });
@@ -65,44 +65,25 @@ const createTodo = async (req: Request, res: Response): Promise<void> => {
 const updateTodo = async (req: Request, res: Response): Promise<void> => {
   try {
     const { _id } = req.params;
-    const { title, description, tags, isActive, timeSpent } = req.body;
+    const { title, description, tags, isActive, timeSpent, thumbnailUrl, attachmentFileUrl } = req.body;
 
-    upload.fields([
-      { name: 'thumbnail', maxCount: 1 },
-      { name: 'attachment', maxCount: 1 },
-    ])(req, res, async (err: any) => {
-      if (err) {
-        console.error('Error uploading files:', err);
-        res.status(500).json({ message: 'Error uploading files' });
-        return;
-      }
-
-      const files = req.files as { [fieldname: string]: Express.MulterS3.File[] } | undefined;
-      const thumbnailUrl = files?.['thumbnail']?.[0]?.location;
-      const attachmentFileUrl = files?.['attachment']?.[0]?.location;
-
-      const updatedTodo = await TodoModel.findByIdAndUpdate(
-        _id,
-        {
-          title,
-          description,
-          tags,
-          thumbnailUrl,
-          attachmentFileUrl,
-          lastUpdatedDate: new Date().toISOString(),
-          isActive,
-          timeSpent,
-        },
-        { new: true }
-      );
-
-      if (!updatedTodo) {
-        res.status(404).json({ message: 'Todo not found' });
-        return;
-      }
-
-      res.status(200).json({ todo: updatedTodo });
+    const updatedTodo = await TodoModel.findByIdAndUpdate(_id, {
+      title,
+      description,
+      tags,
+      thumbnailUrl,
+      attachmentFileUrl,
+      lastUpdatedDate: new Date().toISOString(),
+      isActive,
+      timeSpent,
     });
+
+    if (!updatedTodo) {
+      res.status(404).json({ message: 'Todo not found' });
+      return;
+    }
+
+    res.status(200).json({ todo: updatedTodo });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'Something went wrong on the server' });
@@ -127,4 +108,50 @@ const deleteTodo = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-export { getTodosByIds, createTodo, updateTodo, deleteTodo };
+const addTodoIdToUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { todoId, userId } = req.body;
+
+    if (!todoId) {
+      res.status(400).json({ message: 'Invalid or missing todoId in the request body' });
+      return;
+    }
+
+    const updatedUser = await UserModel.findByIdAndUpdate(userId, { $push: { todoItems: todoId.toString() } });
+
+    if (!updatedUser) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    res.status(200).json({ message: 'Todo added to user successfully' });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Something went wrong on the server' });
+  }
+};
+
+const removeTodoIdFromUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { todoId, userId } = req.body;
+
+    if (!todoId) {
+      res.status(400).json({ message: 'Invalid or missing todoId in the request body' });
+      return;
+    }
+
+    const updatedUser = await UserModel.findByIdAndUpdate(userId, { $pull: { todoItems: todoId.toString() } });
+
+    if (!updatedUser) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    res.status(200).json({ message: 'Todo removed from user successfully' });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ message: 'Something went wrong on the server' });
+  }
+};
+
+export { getTodosByIds, createTodo, updateTodo, deleteTodo, uploadFile, addTodoIdToUser, removeTodoIdFromUser };

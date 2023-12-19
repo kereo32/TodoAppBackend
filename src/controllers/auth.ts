@@ -4,8 +4,8 @@ import UserModel from '../models/User';
 import { generateToken } from '../utils/authUtils';
 import bcrypt from 'bcryptjs';
 
-const isExistingUser = async (username: string): Promise<User> => {
-  return (await UserModel.findOne({ username })) as User;
+const isExistingUser = async (username: string): Promise<User | null> => {
+  return (await UserModel.findOne({ username })) as User | null;
 };
 
 const register = async (req: Request, res: Response): Promise<void> => {
@@ -31,11 +31,11 @@ const register = async (req: Request, res: Response): Promise<void> => {
     });
 
     const token = generateToken(newUser);
-    res.setHeader('Set-Cookie', `token=${token}; HttpOnly`);
-    res.status(201).json({ message: 'Registration successful' });
+
+    res.status(201).json({ message: 'Registration successful', token, user: { username: newUser.username, todoIds: newUser.todoItems, userId: newUser._id } });
   } catch (error) {
     console.error('Error:', error);
-    res.status(500).json({ message: 'Something went wrong on server' });
+    res.status(500).json({ message: 'Something went wrong on the server' });
   }
 };
 
@@ -58,11 +58,13 @@ const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const token = generateToken(existingUser);
-    res.setHeader('Set-Cookie', `token=${token}; HttpOnly`);
-    res.status(200).json({ message: 'Login successful' });
+
+    res
+      .status(200)
+      .json({ message: 'Login successful', token, user: { username: existingUser.username, todoIds: existingUser.todoItems, userId: existingUser._id } });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: 'Something went wrong on server' });
+    res.status(500).json({ message: 'Something went wrong on the server' });
   }
 };
 
